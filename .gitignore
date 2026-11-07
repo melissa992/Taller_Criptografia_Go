@@ -11,7 +11,7 @@ key.bin
 # Binarios compilados
 bin/
 /logguard
-/logguard.exe
+*.exe
 
 # IDEs y SO
 .vscode/
