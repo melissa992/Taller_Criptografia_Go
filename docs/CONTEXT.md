@@ -70,4 +70,35 @@ Este documento consolida las restricciones inmutables y directrices de implement
   - `cli.Session`: Estructura en memoria con campo `Events []domain.Event` donde quedan almacenados los eventos para que HU-2 los tome al consolidar.
   - `cli.ValidateEventCount(input string) error`: Validador puro de cadenas numéricas para captura de CLI.
 
+---
+
+## 5. HU-2 completada
+
+### Decisiones de Implementación Tomadas
+1. **Cambio autorizado en firma de `Protect`**: Modificada de `Protect(n int)` a `Protect(events []domain.Event) (ProtectionResult, error)`. Esto permite consolidar y proteger exactamente la colección de eventos generada y validada en pantalla durante la HU-1 (`Session.Events`), evitando discrepancias por regeneración pseudoaleatoria.
+2. **Formato estándar del artefacto cifrado**: `log.enc` se estructura estrictamente como `nonce (12 bytes) || ciphertext || tag (16 bytes)`. Cada operación genera un nonce fresco mediante `crypto/rand`, previniendo catastróficos ataques de reutilización de nonce en GCM.
+3. **Inmutabilidad y unicidad de serialización**: `domain.Log` se serializa con `json.MarshalIndent` una sola vez. Esos bytes exactos son los que se escriben a `output/log.json`, se alimentan a `HashHex` para `log.sha256` y se pasan a `Encrypt` para producir `log.enc`.
+4. **Semántica de fallas (*Fail-Fast*)**: Si cualquier paso intermedio falla, se interrumpe el flujo retornando un error contextualizado (ej. `"paso 6: cifrar log: ..."`). Los artefactos parciales se conservan para fines forenses/depuración pero se consideran inválidos; cualquier corrida exitosa posterior sobreescribe completamente todos los artefactos.
+5. **Generador de UUID desacoplado**: `generator.NewUUIDv4` es la implementación canónica exportada de UUID v4 con entropía criptográfica (`crypto/rand`). `service` no importa `generator`, sino que recibe esta función por inyección mediante la opción funcional `service.WithIDFunc`.
+
+### Constantes y Firmas Públicas Disponibles para HU-3
+- **`logstore`**:
+  - `logstore.LogFile = "log.json"`
+  - `logstore.LogHashFile = "log.sha256"`
+  - `logstore.KeyFile = "key.bin"`
+  - `logstore.EncryptedLogFile = "log.enc"`
+  - `logstore.EncryptedHashFile = "log.enc.sha256"`
+  - `logstore.DecryptedLogFile = "log.dec.json"`
+  - `logstore.ArtifactStore`: Interfaz con métodos `Save(name string, data []byte, perm os.FileMode) error` y `Load(name string) ([]byte, error)`.
+  - `logstore.ErrInvalidArtifactName`: Error de protección contra path traversal.
+- **`crypto`**:
+  - `crypto.Encryptor`: Interfaz completa que incluye `Decrypt(key, data []byte) ([]byte, error)`.
+  - `crypto.Hasher`: Interfaz con `HashHex(data []byte) string`.
+  - `crypto.ErrAuthenticationFailed`: Error centinela retornado ante fallos de integridad o alteración en `Decrypt`.
+  - `crypto.ErrInvalidKeySize` y `crypto.ErrCiphertextTooShort`.
+- **`service`**:
+  - `service.ProtectionResult`: Estructura con `LogID`, `EventCount`, `EventsByType`, `PlainLogHash`, `EncryptedLogHash`, `ArtifactFiles`.
+  - `service.VerificationService`: Interfaz pendiente a implementar en HU-3 (`Verify() (domain.Report, error)`).
+
+
 

@@ -18,7 +18,7 @@ type Session struct {
 }
 
 type menuItem struct {
-	Label  string
+	Title  string
 	Action func() error
 }
 
@@ -53,11 +53,15 @@ func (m *Menu) Run() error {
 	for {
 		items := []menuItem{
 			{
-				Label:  "1. Generar eventos de log",
+				Title:  "Generar eventos de log",
 				Action: m.handleGenerateEvents,
 			},
 			{
-				Label: "2. Salir",
+				Title:  "Proteger log (consolidar, hash y cifrar)",
+				Action: m.handleProtectLog,
+			},
+			{
+				Title: "Salir",
 				Action: func() error {
 					fmt.Println("\nSaliendo de LogGuard. ¡Hasta luego!")
 					return nil
@@ -67,7 +71,7 @@ func (m *Menu) Run() error {
 
 		labels := make([]string, len(items))
 		for i, item := range items {
-			labels[i] = item.Label
+			labels[i] = fmt.Sprintf("%d. %s", i+1, item.Title)
 		}
 
 		prompt := promptui.Select{
@@ -85,8 +89,8 @@ func (m *Menu) Run() error {
 			return fmt.Errorf("error al desplegar menú principal: %w", err)
 		}
 
-		// Exit option
-		if items[index].Label == "2. Salir" {
+		// Exit option is always the last item
+		if index == len(items)-1 {
 			return items[index].Action()
 		}
 
@@ -123,4 +127,18 @@ func (m *Menu) handleGenerateEvents() error {
 
 	m.session.Events = events
 	return m.presenter.PresentGeneratedEvents(events)
+}
+
+func (m *Menu) handleProtectLog() error {
+	if len(m.session.Events) == 0 {
+		fmt.Println("\n[AVISO] Primero debes generar eventos de log (opción 1).")
+		return nil
+	}
+
+	res, err := m.protectionService.Protect(m.session.Events)
+	if err != nil {
+		return fmt.Errorf("falla durante la protección del log: %w", err)
+	}
+
+	return m.presenter.PresentProtection(res)
 }

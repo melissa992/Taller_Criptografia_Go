@@ -21,7 +21,27 @@ func NewPresenter() *Presenter {
 
 // PresentProtection renders the protection result summary to the console.
 func (p *Presenter) PresentProtection(res service.ProtectionResult) error {
-	return errors.New("not implemented")
+	fmt.Println("\n=========================================================================================")
+	fmt.Println("              RESUMEN DE PROTECCIÓN DE LOG EN REPOSO (PASOS 4 A 7)                       ")
+	fmt.Println("=========================================================================================")
+	fmt.Printf(" Identificador del Log (log_id): %s\n", res.LogID)
+	fmt.Printf(" Total de eventos consolidados:  %d\n", res.EventCount)
+	fmt.Printf(" - Registros de notas:           %d\n", res.EventsByType[domain.GradeRegistered])
+	fmt.Printf(" - Modificaciones de notas:      %d\n", res.EventsByType[domain.GradeModified])
+	fmt.Println("-----------------------------------------------------------------------------------------")
+	fmt.Println(" HASHES CRIPTOGRÁFICOS (SHA-256):")
+	fmt.Println("-----------------------------------------------------------------------------------------")
+	fmt.Printf(" Hash del log en claro (log.json):\n %s\n\n", res.PlainLogHash)
+	fmt.Printf(" Hash del log cifrado (log.enc):\n %s\n", res.EncryptedLogHash)
+	fmt.Println("-----------------------------------------------------------------------------------------")
+	fmt.Println(" ARTEFACTOS GENERADOS EN output/:")
+	fmt.Println("-----------------------------------------------------------------------------------------")
+	for _, art := range res.ArtifactFiles {
+		fmt.Printf("  [OK] output/%s\n", art)
+	}
+	fmt.Println("=========================================================================================")
+	fmt.Println()
+	return nil
 }
 
 // PresentReport renders the final verification report and integrity verdict to the console.

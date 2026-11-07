@@ -41,4 +41,3 @@ func TestValidateEventCount(t *testing.T) {
 		})
 	}
 }
-

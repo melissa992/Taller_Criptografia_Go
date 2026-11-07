@@ -195,4 +195,3 @@ func TestVerifyPayloadHash_TamperedEvent(t *testing.T) {
 		t.Error("expected VerifyPayloadHash to detect tampering and return false")
 	}
 }
-
