@@ -1,0 +1,20 @@
+# Artefactos generados por la aplicación
+output/*
+!output/.gitkeep
+
+# Insumos criptográficos y archivos sensibles
+key.bin
+*.enc
+*.dec.json
+*.sha256
+
+# Binarios compilados
+bin/
+/logguard
+/logguard.exe
+
+# IDEs y SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

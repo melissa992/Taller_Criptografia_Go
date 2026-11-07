@@ -1,0 +1,138 @@
+classDiagram
+    direction TB
+
+    namespace cmd {
+        class Main {
+            +main()
+        }
+    }
+
+    namespace cli {
+        class Menu {
+            -protectionService ProtectionService
+            -verificationService VerificationService
+            -presenter Presenter
+            +Run() error
+        }
+        class Presenter {
+            +PresentProtection(res ProtectionResult) error
+            +PresentReport(rep Report) error
+        }
+    }
+
+    namespace service {
+        class ProtectionService {
+            <<interface>>
+            +Protect(n int) (ProtectionResult, error)
+        }
+        class VerificationService {
+            <<interface>>
+            +Verify() (Report, error)
+        }
+        class ProtectionResult {
+            +string LogID
+            +int EventCount
+            +string PlainLogHash
+            +string EncryptedLogHash
+        }
+    }
+
+    namespace domain {
+        class Event {
+            +string EventID
+            +EventType EventType
+            +string Timestamp
+            +string ActorUID
+            +string StudentUID
+            +string CourseUID
+            +float64 Grade
+            +string PayloadHash
+        }
+        class Log {
+            +string LogID
+            +string Version
+            +string GeneratedAt
+            +int EventCount
+            +Event[] Events
+        }
+        class Report {
+            +string LogID
+            +int EventCount
+            +string PlainLogHash
+            +string EncryptedLogHash
+            +string DecryptedLogHash
+            +bool IntegrityPreserved
+        }
+    }
+
+    namespace crypto {
+        class Hasher {
+            <<interface>>
+            +HashHex(data []byte) string
+        }
+        class Encryptor {
+            <<interface>>
+            +GenerateKey() ([]byte, error)
+            +Encrypt(key []byte, plaintext []byte) ([]byte, error)
+            +Decrypt(key []byte, data []byte) ([]byte, error)
+        }
+        class SHA256Hasher {
+            +HashHex(data []byte) string
+        }
+        class AESGCMEncryptor {
+            +GenerateKey() ([]byte, error)
+            +Encrypt(key []byte, plaintext []byte) ([]byte, error)
+            +Decrypt(key []byte, data []byte) ([]byte, error)
+        }
+    }
+
+    namespace generator {
+        class EventGenerator {
+            <<interface>>
+            +Generate(n int) ([]Event, error)
+        }
+        class RandomEventGenerator {
+            +Generate(n int) ([]Event, error)
+        }
+    }
+
+    namespace logstore {
+        class ArtifactStore {
+            <<interface>>
+            +Save(name string, data []byte, perm FileMode) error
+            +Load(name string) ([]byte, error)
+        }
+        class FileStore {
+            -string baseDir
+            +Save(name string, data []byte, perm FileMode) error
+            +Load(name string) ([]byte, error)
+        }
+    }
+
+    Main ..> Menu : initializes
+    Main ..> SHA256Hasher : instantiates
+    Main ..> AESGCMEncryptor : instantiates
+    Main ..> FileStore : instantiates
+    Main ..> RandomEventGenerator : instantiates
+
+    Menu --> ProtectionService : invokes
+    Menu --> VerificationService : invokes
+    Menu --> Presenter : uses
+
+    ProtectionService ..> domain : uses
+    VerificationService ..> domain : uses
+
+    ProtectionService --> EventGenerator : depends on
+    ProtectionService --> Hasher : depends on
+    ProtectionService --> Encryptor : depends on
+    ProtectionService --> ArtifactStore : depends on
+
+    VerificationService --> Hasher : depends on
+    VerificationService --> Encryptor : depends on
+    VerificationService --> ArtifactStore : depends on
+
+    SHA256Hasher ..|> Hasher : implements
+    AESGCMEncryptor ..|> Encryptor : implements
+    FileStore ..|> ArtifactStore : implements
+    RandomEventGenerator ..|> EventGenerator : implements
+

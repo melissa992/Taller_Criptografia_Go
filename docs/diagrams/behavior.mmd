@@ -1,0 +1,54 @@
+sequenceDiagram
+    autonumber
+    actor User as Usuario (CLI)
+    participant Menu as CLI / Menu
+    participant ProtSvc as ProtectionService
+    participant Gen as EventGenerator
+    participant Hash as Hasher (SHA-256)
+    participant Enc as Encryptor (AES-256-GCM)
+    participant Store as ArtifactStore (FileStore)
+    participant VerSvc as VerificationService
+    participant Pres as Presenter
+
+    Note over User, Pres: FASE 1: Generación y Protección (Pasos 1 a 7)
+    User->>Menu: 1. Ingresar cantidad de eventos (n)
+    Menu->>ProtSvc: Protect(n)
+    ProtSvc->>Gen: 2. Generate(n)
+    loop Para cada evento
+        Gen->>Hash: 3. ComputePayloadHash(event) [excluyendo payload_hash]
+        Hash-->>Gen: payload_hash
+    end
+    Gen-->>ProtSvc: []Event
+    ProtSvc->>ProtSvc: 4. Consolidar estructura Log (JSON determinista)
+    ProtSvc->>Hash: 5. HashHex(log_bytes)
+    Hash-->>ProtSvc: plain_log_hash (guardar log.sha256)
+    ProtSvc->>Store: Save("log.json", log_bytes, 0644)
+    ProtSvc->>Store: Save("log.sha256", plain_log_hash, 0644)
+    ProtSvc->>Enc: GenerateKey()
+    Enc-->>ProtSvc: key_256bit
+    ProtSvc->>Store: Save("key.bin", key_256bit, 0600)
+    ProtSvc->>Enc: 6. Encrypt(key, log_bytes)
+    Enc-->>ProtSvc: ciphertext (nonce || ciphertext || tag)
+    ProtSvc->>Hash: 7. HashHex(ciphertext)
+    Hash-->>ProtSvc: encrypted_log_hash
+    ProtSvc->>Store: Save("log.enc", ciphertext, 0644)
+    ProtSvc->>Store: Save("log.enc.sha256", encrypted_log_hash, 0644)
+    ProtSvc-->>Menu: ProtectionResult
+    Menu->>Pres: PresentProtection(ProtectionResult)
+    Pres-->>User: Mostrar confirmación y hashes generados
+
+    Note over User, Pres: FASE 2: Verificación y Recuperación (Pasos 8 a 10)
+    User->>Menu: Seleccionar Verificación de Integridad
+    Menu->>VerSvc: Verify()
+    VerSvc->>Store: Load("log.enc"), Load("key.bin"), Load("log.sha256")
+    Store-->>VerSvc: ciphertext, key, original_plain_hash
+    VerSvc->>Enc: 8. Decrypt(key, ciphertext)
+    Enc-->>VerSvc: decrypted_bytes
+    VerSvc->>Store: Save("log.dec.json", decrypted_bytes, 0644)
+    VerSvc->>Hash: 9. HashHex(decrypted_bytes)
+    Hash-->>VerSvc: decrypted_plain_hash
+    VerSvc->>VerSvc: Comparar (original_plain_hash == decrypted_plain_hash)
+    VerSvc-->>Menu: 10. domain.Report (Veredicto de Integridad)
+    Menu->>Pres: PresentReport(Report)
+    Pres-->>User: Mostrar reporte completo con veredicto
+
