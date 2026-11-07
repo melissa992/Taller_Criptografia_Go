@@ -11,4 +11,3 @@ type Report struct {
 	IntegrityPreserved bool              `json:"integrity_preserved"`
 	Details            string            `json:"details,omitempty"`
 }
-

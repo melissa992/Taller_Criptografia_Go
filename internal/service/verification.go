@@ -37,4 +37,3 @@ func NewVerificationService(
 func (s *verificationService) Verify() (domain.Report, error) {
 	return domain.Report{}, errors.New("not implemented")
 }
-
