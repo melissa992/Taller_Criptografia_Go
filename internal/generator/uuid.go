@@ -5,8 +5,8 @@ import (
 	"fmt"
 )
 
-// generateUUIDv4 generates an RFC 4122 compliant version 4 UUID using cryptographic randomness.
-func generateUUIDv4() (string, error) {
+// NewUUIDv4 generates an RFC 4122 compliant version 4 UUID using cryptographic randomness.
+func NewUUIDv4() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes for UUID v4: %w", err)
@@ -26,3 +26,5 @@ func generateUUIDv4() (string, error) {
 	), nil
 }
 
+// generateUUIDv4 is an alias for NewUUIDv4 preserved for internal package compatibility.
+var generateUUIDv4 = NewUUIDv4

@@ -8,4 +8,3 @@ type Log struct {
 	EventCount  int     `json:"event_count"`
 	Events      []Event `json:"events"`
 }
-

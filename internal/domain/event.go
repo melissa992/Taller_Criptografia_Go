@@ -25,4 +25,3 @@ type Event struct {
 	NewGrade      *float64  `json:"new_grade,omitempty"`
 	PayloadHash   string    `json:"payload_hash"`
 }
-

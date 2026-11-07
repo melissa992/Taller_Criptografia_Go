@@ -14,16 +14,16 @@ import (
 )
 
 func main() {
-	// Infrastructure and cryptographic primitives stubs (HU-2 / HU-3)
-	hasher := crypto.NewSHA256Hasher()
-	encryptor := crypto.NewAESGCMEncryptor()
-	store := logstore.NewFileStore("./output")
-
 	// --- HU-1: Generación de eventos ---
 	gen := generator.NewRandomEventGenerator()
 
-	// Services stubs (HU-2 / HU-3)
-	protectionSvc := service.NewProtectionService(gen, hasher, encryptor, store)
+	// --- HU-2: Consolidación, hash y cifrado ---
+	hasher := crypto.NewSHA256Hasher()
+	encryptor := crypto.NewAESGCMEncryptor()
+	store := logstore.NewFileStore("./output")
+	protectionSvc := service.NewProtectionService(hasher, encryptor, store, service.WithIDFunc(generator.NewUUIDv4))
+
+	// --- HU-3: Verificación e integridad (stub) ---
 	verificationSvc := service.NewVerificationService(hasher, encryptor, store)
 
 	// Presentation layer and CLI menu

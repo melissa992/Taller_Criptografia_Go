@@ -2,6 +2,11 @@
 // relying strictly on the Go standard library.
 package crypto
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+)
+
 // Hasher specifies the contract for computing cryptographic hash digests.
 type Hasher interface {
 	HashHex(data []byte) string
@@ -15,8 +20,8 @@ func NewSHA256Hasher() *SHA256Hasher {
 	return &SHA256Hasher{}
 }
 
-// HashHex returns the hexadecimal encoded SHA-256 digest of data.
+// HashHex returns the hexadecimal encoded SHA-256 digest of data in lowercase 64 characters.
 func (h *SHA256Hasher) HashHex(data []byte) string {
-	return ""
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
-
