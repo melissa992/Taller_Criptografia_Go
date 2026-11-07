@@ -44,3 +44,30 @@ Este documento consolida las restricciones inmutables y directrices de implement
 - **Inmutabilidad de Bytes**: El hash del log en texto claro y el cifrado deben operar sobre el mismo slice `[]byte` exacto que se escribe a disco en `output/log.json`.
 - **Arquitectura**: Mantener el desacoplamiento estricto: `domain` sin dependencias, `service` dependiente únicamente de interfaces.
 
+---
+
+## 4. HU-1 completada
+
+### Decisiones de Implementación Tomadas
+1. **Discretización uniforme de notas**: Muestreo uniforme sobre 51 puntos discretos $\{0.0, 0.1, \dots, 5.0\}$ mediante `float64(rng.IntN(51)) / 10.0`. Se descartó redondear números flotantes continuos porque los extremos (0.0 y 5.0) tendrían intervalos de ancho 0.05 (mitad de probabilidad relativa respecto a los valores interiores con ancho 0.1).
+2. **Pool de UIDs simulados**: Por cada lote se instancian 5 docentes (`doc-XXXXXX`), 20 estudiantes (`est-XXXXXX`) y 5 cursos (`cur-XXXXXX`) generados con el generador pseudoaleatorio, permitiendo repeticiones realistas de actores y asignaturas.
+3. **Prevención de circularidad de hash (`eventPayload`)**: La estructura privada `eventPayload` replica exactamente los campos y tags JSON de `Event` omitiendo de forma estricta `payload_hash`. Se utiliza una struct (y no un map) para garantizar ordenamiento determinista de claves durante `json.Marshal`.
+4. **Verificación en tiempo constante**: `domain.VerifyPayloadHash` utiliza `crypto/subtle.ConstantTimeCompare` para prevenir ataques de canal lateral basados en tiempo.
+5. **Generador UUID v4 nativo**: Implementado en `internal/generator/uuid.go` usando exclusivamente `crypto/rand` con configuración canónica de bits de versión (4) y variante RFC 4122 (`10xx`).
+
+### Firmas Públicas Disponibles para HU-2
+- **`domain`**:
+  - `domain.ComputePayloadHash(e Event) (string, error)`: Calcula el hash SHA-256 en hexadecimal (64 caracteres) del evento excluyendo su propio hash.
+  - `domain.VerifyPayloadHash(e Event) (bool, error)`: Verifica la integridad de un evento recalculando el digest y comparando en tiempo constante.
+  - `domain.Event`, `domain.EventType`, `domain.GradeRegistered`, `domain.GradeModified`.
+  - `domain.Log`: Estructura para consolidación de logs (`LogID`, `Version`, `GeneratedAt`, `EventCount`, `Events`).
+- **`generator`**:
+  - `generator.MaxEvents`: Constante de límite máximo (`10000`).
+  - `generator.ErrInvalidEventCount`: Error centinela para validación de rango $[1, 10000]$.
+  - `generator.EventGenerator`: Interfaz de generación `Generate(n int) ([]domain.Event, error)`.
+  - `generator.NewRandomEventGenerator(opts ...Option) *RandomEventGenerator`: Constructor con opciones funcionales (`WithSeed`, `WithClock`, `WithIDFunc`).
+- **`cli`**:
+  - `cli.Session`: Estructura en memoria con campo `Events []domain.Event` donde quedan almacenados los eventos para que HU-2 los tome al consolidar.
+  - `cli.ValidateEventCount(input string) error`: Validador puro de cadenas numéricas para captura de CLI.
+
+
