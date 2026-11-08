@@ -16,6 +16,8 @@ classDiagram
 
     class Session {
         +Events []Event
+        -protectedLogID string
+        -verified bool
     }
 
     class Presenter {
@@ -57,13 +59,6 @@ classDiagram
         -encryptor Encryptor
         -store ArtifactStore
         +Verify() (Report, error)
-    }
-
-    class TamperingStore {
-        -inner ArtifactStore
-        -scenario string
-        +Save(name string, data []byte, perm FileMode) error
-        +Load(name string) ([]byte, error)
     }
 
     class Event {
@@ -168,8 +163,6 @@ classDiagram
     verificationService --> Encryptor : depende
     verificationService --> ArtifactStore : depende
 
-    TamperingStore ..|> ArtifactStore : implementa
-    TamperingStore --> ArtifactStore : decora
 
     SHA256Hasher ..|> Hasher : implementa
     AESGCMEncryptor ..|> Encryptor : implementa

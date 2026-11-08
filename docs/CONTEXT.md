@@ -29,8 +29,8 @@ Este documento consolida las restricciones inmutables y directrices de implement
 5. **Hash del Log en Claro**: Generar `log.sha256` a partir de los bytes exactos de `log.json` (sin re-serializar).
 6. **Cifrado**: Generar clave AES-256 aleatoria (guardar en `key.bin` con permisos `0600`). Cifrar `log.json` con AES-256-GCM y nonce de 12 bytes (`nonce || ciphertext || tag`) en `log.enc`.
 7. **Hash del Cifrado**: Generar SHA-256 de `log.enc` y guardarlo en `log.enc.sha256`.
-8. **Descifrado**: Leer `key.bin` y `log.enc`, descifrar con AES-256-GCM y guardar en `log.dec.json`.
-9. **Hash del Descifrado**: Calcular SHA-256 de `log.dec.json` y comparar en tiempo constante con `log.sha256`.
+8. **Descifrado**: Cotejar `log.enc` con `log.enc.sha256`, autenticar y descifrar con AES-256-GCM y `key.bin`, y reconstruir el log en memoria.
+9. **Hash del Descifrado**: Calcular SHA-256 de los bytes recuperados y comparar en tiempo constante con `log.sha256`. Guardar esos bytes en `log.dec.json` si los hashes coinciden.
 10. **Reporte**: Presentar en consola el resumen de eventos por tipo, hashes en cada etapa y veredicto booleano de integridad.
 
 ---
@@ -98,7 +98,7 @@ Este documento consolida las restricciones inmutables y directrices de implement
   - `crypto.ErrInvalidKeySize` y `crypto.ErrCiphertextTooShort`.
 - **`service`**:
   - `service.ProtectionResult`: Estructura con `LogID`, `EventCount`, `EventsByType`, `PlainLogHash`, `EncryptedLogHash`, `ArtifactFiles`.
-  - `service.VerificationService`: Interfaz pendiente a implementar en HU-3 (`Verify() (domain.Report, error)`).
+  - `service.VerificationService`: Verifica los artefactos persistidos y devuelve un reporte de integridad (`Verify() (domain.Report, error)`).
 
 
 

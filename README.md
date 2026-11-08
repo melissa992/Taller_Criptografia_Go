@@ -48,18 +48,17 @@ go build -o logguard.exe ./cmd/logguard
 .\logguard.exe
 ```
 
-El menu interactivo presenta cinco opciones navegables con las teclas de flecha:
+El menú interactivo presenta cuatro opciones navegables con las teclas de flecha:
 
 ```
 Menu Principal - LogGuard
-  1. Generar eventos de log
-  2. Proteger log (consolidar, hash y cifrar)
-  3. Verificar integridad
-  4. Demostracion de alteracion
-  5. Salir
+  1. Generar eventos
+  2. Proteger lote actual
+  3. Verificar log guardado
+  4. Salir
 ```
 
-**Flujo recomendado:** 1 → 2 → 3 → 4 → 5
+**Flujo recomendado:** 1 → 2 → 3 → 4
 
 Los artefactos se escriben en el directorio `output/` creado automaticamente en el directorio de trabajo.
 
@@ -91,7 +90,7 @@ Los artefactos se escriben en el directorio `output/` creado automaticamente en 
 | `key.bin` | Clave simetrica AES-256 cruda (32 bytes) | 0600 | 6 |
 | `log.enc` | Log cifrado: `nonce(12 B) \|\| ciphertext \|\| tag(16 B)` | 0644 | 6 |
 | `log.enc.sha256` | Hash SHA-256 hexadecimal de `log.enc` seguido de salto de linea | 0644 | 7 |
-| `log.dec.json` | Resultado del descifrado de `log.enc`, usado para verificacion de hash | 0644 | 8 |
+| `log.dec.json` | Bytes recuperados cuando la verificación de integridad es satisfactoria | 0600 | 9 |
 
 Para verificar un hash de forma manual en PowerShell:
 
@@ -200,7 +199,7 @@ La salida no debe contener `generator`.
 |----------|-----------------|----------------------|
 | HU-1: Generacion de eventos con integridad por registro | 1, 2, 3 | `domain`, `generator`, `cli` |
 | HU-2: Consolidacion, hash y cifrado del log en reposo | 4, 5, 6, 7 | `crypto`, `logstore`, `service`, `cli` |
-| HU-3: Verificacion de integridad y demostracion de alteracion | 8, 9, 10 | `service`, `logstore`, `cli` |
+| HU-3: Verificación de integridad | 8, 9, 10 | `service`, `logstore`, `cli` |
 
 ---
 
@@ -217,6 +216,17 @@ Para ver detalle de cada prueba solo si hay fallos:
 ```powershell
 go test ./... -count=1 -v
 ```
+
+## Verificar un log protegido
+
+1. Ejecuta `go run ./cmd/logguard` desde la raíz del proyecto.
+2. Elige **Generar eventos** e indica la cantidad. El lote queda en memoria.
+3. Elige **Proteger lote actual** y confirma el guardado. La CLI reemplaza los archivos de protección que ya existan en `output/`.
+4. Elige **Verificar log guardado**. Puedes ir directamente a esta opción al reiniciar la CLI con los artefactos de protección en `output/`.
+
+El reporte muestra el total de eventos y su desglose por tipo, los tres SHA-256 y el veredicto de integridad. Si los hashes coinciden y el descifrado se autentica, la CLI escribe los bytes recuperados en `output/log.dec.json`.
+
+Consulta los diagramas de [estructura](docs/diagrams/structure.mmd) y [comportamiento](docs/diagrams/behavior.mmd) en Mermaid.
 
 ---
 

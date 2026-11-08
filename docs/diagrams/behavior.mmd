@@ -4,7 +4,6 @@ sequenceDiagram
     participant Gen as EventGenerator (RandomEventGenerator)
     participant ProtSvc as ProtectionService (protectionService)
     participant VerSvc as VerificationService (verificationService)
-    participant TmpStore as TamperingStore
     participant Hash as Hasher (SHA256Hasher)
     participant Enc as Encryptor (AESGCMEncryptor)
     participant Store as ArtifactStore (FileStore)
@@ -12,7 +11,7 @@ sequenceDiagram
 
     Note over User,Pres: Pasos 1-3: Generacion e integridad por registro
 
-    User->>Menu: Paso 1: Selecciona "1. Generar eventos de log" e ingresa n (1-10000)
+    User->>Menu: Paso 1: Selecciona "1. Generar eventos" e ingresa n (1-10000)
     Menu->>Gen: Paso 2: Generate(n)
     loop Para cada evento i en 0..n-1
         Gen->>Gen: Determina tipo 50/50 (GRADE_REGISTERED o GRADE_MODIFIED), UIDs de pools y nota uniforme [0.0,5.0]
@@ -26,7 +25,7 @@ sequenceDiagram
 
     Note over User,Pres: Pasos 4-7: Consolidacion, hash y cifrado
 
-    User->>Menu: Paso 4: Selecciona "2. Proteger log (consolidar, hash y cifrar)"
+    User->>Menu: Paso 4: Selecciona "2. Proteger lote actual y confirmar"
     Menu->>ProtSvc: Protect(session.Events)
     ProtSvc->>ProtSvc: Valida len(events) mayor que 0 y genera log_id con NewUUIDv4
     ProtSvc->>ProtSvc: Paso 4: Construye domain.Log y serializa con json.MarshalIndent (una sola vez)
@@ -47,45 +46,30 @@ sequenceDiagram
     Menu->>Pres: PresentProtection(ProtectionResult)
     Pres-->>User: log_id, metricas, hash en claro, hash cifrado y lista de artefactos
 
-    Note over User,Pres: Pasos 8-10: Verificacion de integridad y demostracion de alteracion
-
-    User->>Menu: Paso 8: Selecciona "3. Verificar integridad"
+    Note over User,Pres: Verificación de artefactos persistidos (HU-3)
+    User->>Menu: Verificar log guardado
     Menu->>VerSvc: Verify()
-    VerSvc->>Store: Load("log.enc.sha256") y Load("log.enc")
-    VerSvc->>Hash: HashHex(bytesEnc)
-    Hash-->>VerSvc: hashCalculado
-    VerSvc->>VerSvc: Compara hashCalculado vs contenido de log.enc.sha256 (tiempo constante)
-    VerSvc->>Store: Load("key.bin")
-    VerSvc->>Enc: Paso 8: Decrypt(key, ciphertext)
-    Enc-->>VerSvc: bytesDescifrados
-    VerSvc->>Store: Save("log.dec.json", bytesDescifrados, 0644)
-    VerSvc->>Hash: Paso 9: HashHex(bytesDescifrados)
-    Hash-->>VerSvc: decryptedLogHash
-    VerSvc->>Store: Load("log.sha256")
-    VerSvc->>VerSvc: Compara decryptedLogHash vs plainLogHash original (tiempo constante)
-    VerSvc->>VerSvc: Verifica payload_hash de cada evento (VerifyPayloadHash)
-    VerSvc-->>Menu: Paso 10: domain.Report (IntegrityPreserved, hashes, Details)
-    Menu->>Pres: PresentReport(Report)
-    Pres-->>User: Reporte con veredicto de integridad y hashes de cada etapa
-
-    User->>Menu: Selecciona "4. Demostracion de alteracion"
-    Menu->>Menu: Instancia TamperingStore con escenario seleccionado
-
-    alt Escenario A: byte alterado en log.enc
-        Menu->>TmpStore: Load("log.enc") devuelve bytes con un byte mutado
-        TmpStore->>Enc: Decrypt falla - AES-GCM rechaza tag de autenticacion
-        Enc-->>VerSvc: ErrAuthenticationFailed
-        VerSvc-->>Menu: Report con IntegrityPreserved=false y Details con causa
-    else Escenario B: byte alterado en log.json (hash no coincide)
-        Menu->>TmpStore: Load("log.dec.json") devuelve bytes con un byte mutado
-        VerSvc->>VerSvc: Hash del descifrado no coincide con log.sha256
-        VerSvc-->>Menu: Report con IntegrityPreserved=false y Details con causa
-    else Escenario C: clave incorrecta
-        Menu->>TmpStore: Load("key.bin") devuelve clave erronea de 32 bytes
-        TmpStore->>Enc: Decrypt falla - tag de autenticacion no valida
-        Enc-->>VerSvc: ErrAuthenticationFailed
-        VerSvc-->>Menu: Report con IntegrityPreserved=false y Details con causa
+    VerSvc->>Store: Leer log.enc y log.enc.sha256
+    VerSvc->>Hash: HashHex(bytes cifrados)
+    Hash-->>VerSvc: SHA-256 del cifrado
+    VerSvc->>VerSvc: Cotejar con log.enc.sha256
+    alt Cifrado y referencia coinciden
+        VerSvc->>Store: Leer key.bin
+        VerSvc->>Enc: Decrypt(clave, bytes cifrados)
+        Enc-->>VerSvc: Bytes autenticados o error
+        VerSvc->>VerSvc: Reconstruir Log y contar eventos por tipo
+        VerSvc->>Store: Leer log.sha256
+        VerSvc->>Hash: HashHex(bytes recuperados)
+        Hash-->>VerSvc: SHA-256 del descifrado
+        VerSvc->>VerSvc: Comparar con log.sha256 en tiempo constante
+        opt Original y descifrado coinciden
+            VerSvc->>Store: Guardar bytes exactos en log.dec.json (0600)
+        end
+        VerSvc-->>Menu: Report con los tres hashes y el veredicto
+        Menu->>Pres: PresentReport(Report)
+        Pres-->>User: Mostrar totales, hashes e integridad
+    else El SHA-256 del cifrado difiere de su referencia
+        VerSvc-->>Menu: Error con hashes esperado y calculado
+        Menu-->>User: Integridad no comprobada
     end
-
-    Menu->>Pres: PresentReport(Report)
-    Pres-->>User: Reporte de demostracion con veredicto negativo y causa del fallo
+    Note over Menu,VerSvc: Un error de lectura, autenticación, JSON o escritura también interrumpe la verificación

@@ -23,7 +23,7 @@ func main() {
 	store := logstore.NewFileStore("./output")
 	protectionSvc := service.NewProtectionService(hasher, encryptor, store, service.WithIDFunc(generator.NewUUIDv4))
 
-	// --- HU-3: Verificación e integridad (stub) ---
+	// --- HU-3: Verificación e integridad ---
 	verificationSvc := service.NewVerificationService(hasher, encryptor, store)
 
 	// Presentation layer and CLI menu

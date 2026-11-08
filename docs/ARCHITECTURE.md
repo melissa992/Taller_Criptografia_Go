@@ -101,7 +101,18 @@ El pipeline genera los siguientes artefactos en el directorio `output/`:
 Si la ejecución de `Protect` falla en un paso intermedio (por ejemplo, fallo de I/O al escribir `key.bin` o error de cifrado):
 - **Comportamiento adoptado**: *Fail-fast* con reporte de contexto del paso fallido (ej. `"paso 6: cifrar log: ..."`).
 - **Tratamiento de artefactos parciales**: No se eliminan los artefactos que hayan alcanzado a escribirse en disco. Esto permite inspección forense y depuración del estado del sistema en auditorías. Sin embargo, el conjunto queda catalogado como inválido e incompleto ya que la cadena de hashes y cifrado no se cerró.
-- **Sobreescritura garantizada**: Cualquier ejecución posterior exitosa sobreescribe completamente todos los archivos en `output/` con una clave, un nonce y un lote de hashes nuevos.
+- **Nueva protección**: Una ejecución exitosa de `Protect` sobrescribe sus cinco artefactos con una clave, un nonce y hashes nuevos.
+
+### 4.2 Verificación y reporte
+
+1. `Verify` recalcula el SHA-256 de `log.enc` y lo coteja con `log.enc.sha256`. Si coinciden, usa AES-256-GCM y `key.bin` para autenticar y recuperar el contenido.
+2. Reconstruye `domain.Log` desde el JSON y obtiene el total y el desglose de eventos. Calcula el SHA-256 sobre los bytes recuperados y lo compara en tiempo constante con la referencia de `log.sha256`.
+3. Si coinciden los hashes del original y del descifrado, escribe los bytes exactos en `log.dec.json` con modo `0600`. Si difieren, devuelve un reporte con veredicto negativo. Un fallo de lectura, autenticación, reconstrucción o escritura produce un error contextualizado.
+
+La verificación usa los artefactos persistidos y puede ejecutarse en una sesión nueva de la CLI. Cada veredicto corresponde al intento actual. Si la comprobación falla, puede quedar en disco un `log.dec.json` de una verificación previa. La comparación toma `log.sha256` como referencia de confianza.
+
+- [Diagrama de estructura](diagrams/structure.mmd)
+- [Diagrama de comportamiento](diagrams/behavior.mmd)
 
 ---
 

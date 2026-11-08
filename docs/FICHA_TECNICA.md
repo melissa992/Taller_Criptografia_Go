@@ -1,7 +1,7 @@
 # Ficha Técnica — LogGuard: Protección de Logs Estructurados en Reposo
 
 Documento técnico elaborado a partir de hechos y firmas verificadas del código fuente actual.
-Cubre las fases implementadas **HU-1** y **HU-2**, y detalla el estado de **HU-3 (Pendiente)**.
+Cubre las fases implementadas **HU-1**, **HU-2** y **HU-3**.
 
 ---
 
@@ -219,7 +219,7 @@ Constantes definidas en `internal/logstore/store.go`.
 | `output/key.bin` | Clave simétrica cruda de 32 bytes (256 bits) | `0600` | Paso 6 |
 | `output/log.enc` | Artefacto cifrado: nonce (12 B) + ciphertext + tag (16 B) | `0644` | Paso 6 |
 | `output/log.enc.sha256` | Hash SHA-256 en hexadecimal del log cifrado (con `\n`) | `0644` | Paso 7 |
-| `output/log.dec.json` | Log descifrado en texto plano | *No creado aún* | Paso 8 (HU-3) |
+| `output/log.dec.json` | Bytes descifrados guardados tras verificar la integridad | `0600` | Pasos 8–9 (HU-3) |
 
 ---
 
@@ -260,7 +260,7 @@ cmd/logguard/main.go (Composition Root)
   - `generator.EventGenerator` $\leftarrow$ implementada por `generator.RandomEventGenerator`
   - `logstore.ArtifactStore` $\leftarrow$ implementada por `logstore.FileStore`
   - `service.ProtectionService` $\leftarrow$ implementada por `service.protectionService`
-  - `service.VerificationService` $\leftarrow$ implementada por `service.verificationService` (Stub HU-3)
+  - `service.VerificationService` $\leftarrow$ implementada por `service.verificationService`
 - **Regla de dependencias:**
   - `domain` no depende de ningún paquete interno ni externo.
   - `service` depende exclusivamente de interfaces (`Hasher`, `Encryptor`, `ArtifactStore`) y de `domain`. No importa `generator`, `logstore` ni `crypto`.
@@ -287,7 +287,7 @@ Actualizados en `docs/diagrams/structure.mmd` y `docs/diagrams/behavior.mmd`.
   2. `service` desacoplado de `generator`: `protectionService` ya no depende de `EventGenerator`, recibe eventos desde `cli.Menu` y el generador de IDs se inyecta desde `main.go`.
   3. `cli.Menu`: ahora almacena `generator` y `Session` para transferir eventos a `ProtectionService`.
   4. `Presenter`: incluye el método `PresentGeneratedEvents(events []Event)`.
-  5. Diagrama de secuencia: actualizado para separar explícitamente el flujo de HU-1 (pasos 1–3), HU-2 (pasos 4–7) y marcar la fase HU-3 (pasos 8–10) como "Pendiente".
+  5. Diagrama de secuencia: separa el flujo de HU-1 (pasos 1–3), HU-2 (pasos 4–7) y HU-3 (pasos 8–10).
 
 ---
 
@@ -384,7 +384,7 @@ Write-Host "Contiene 'student_uid': $($raw -match 'student_uid')"
 - **Permisos en Windows:** `os.WriteFile` con modo `0600` no restringe las listas de control de acceso (ACLs) de Windows como lo hace en sistemas POSIX.
 - **Almacenamiento de clave en disco:** En un entorno productivo de grado corporativo, la clave simétrica no debe almacenarse en el mismo sistema de archivos que los datos cifrados; debe custodiarse en un KMS (AWS KMS, Vault) o un HSM FIPS 140-2.
 - **Fallas intermedias:** Ante un error durante el pipeline de protección, los artefactos ya creados no se borran para facilitar auditorías forenses, pero el lote queda catalogado como incompleto.
-- **Descifrado CLI pendiente:** El descifrado completo desde la interfaz de terminal corresponde al alcance de HU-3.
+- **Referencia de integridad:** La verificación compara los bytes descifrados con el hash almacenado en `log.sha256`. Un `log.dec.json` anterior puede seguir en disco si la verificación falla.
 
 ---
 
@@ -457,11 +457,11 @@ Write-Host "Contiene 'student_uid': $($raw -match 'student_uid')"
 
 ---
 
-## F. Pendiente (HU-3)
+## F. Verificación de integridad (HU-3)
 
-### 20. Alcance pendiente para la HU-3
-1. **Paso 8 del taller:** Implementación de la operación de descifrado expuesta desde el menú interactivo del CLI y persistencia del artefacto `output/log.dec.json`.
-2. **Paso 9 del taller:** Cálculo del hash SHA-256 sobre el log descifrado y comparación en tiempo constante contra el hash original `output/log.sha256`.
-3. **Paso 10 del taller:** Consolidación y presentación en pantalla del reporte final de verificación (`domain.Report`) con el veredicto booleano de integridad.
-4. **Demostración de alteración:** Opción o mecanismo para simular manipulación de un byte en el archivo cifrado `output/log.enc` y evidenciar el fallo de autenticación de AES-GCM (`ErrAuthenticationFailed`).
+### 20. Flujo implementado para la HU-3
+1. **Paso 8:** La opción «Verificar log guardado» coteja el hash de `log.enc` con `log.enc.sha256`, autentica y descifra el contenido con AES-256-GCM y reconstruye el log JSON.
+2. **Paso 9:** Calcula SHA-256 sobre los bytes recuperados y compara el resultado en tiempo constante con `output/log.sha256`. Si coinciden, guarda esos bytes en `output/log.dec.json`.
+3. **Paso 10:** Presenta el total y los tipos de eventos, los hashes de las tres etapas y el veredicto de integridad.
+4. **Comprobación de alteraciones:** Las pruebas verifican que un cifrado alterado se detecte tanto mediante el hash almacenado como mediante la autenticación GCM. La CLI ofrece la verificación del log guardado.
 
