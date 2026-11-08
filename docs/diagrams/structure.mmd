@@ -1,138 +1,177 @@
 classDiagram
     direction TB
 
-    namespace cmd {
-        class Main {
-            +main()
-        }
+    class Main {
+        +main()
     }
 
-    namespace cli {
-        class Menu {
-            -protectionService ProtectionService
-            -verificationService VerificationService
-            -presenter Presenter
-            +Run() error
-        }
-        class Presenter {
-            +PresentProtection(res ProtectionResult) error
-            +PresentReport(rep Report) error
-        }
+    class Menu {
+        -protectionService ProtectionService
+        -verificationService VerificationService
+        -presenter Presenter
+        -generator EventGenerator
+        -session Session
+        +Run() error
     }
 
-    namespace service {
-        class ProtectionService {
-            <<interface>>
-            +Protect(n int) (ProtectionResult, error)
-        }
-        class VerificationService {
-            <<interface>>
-            +Verify() (Report, error)
-        }
-        class ProtectionResult {
-            +string LogID
-            +int EventCount
-            +string PlainLogHash
-            +string EncryptedLogHash
-        }
+    class Session {
+        +Events []Event
     }
 
-    namespace domain {
-        class Event {
-            +string EventID
-            +EventType EventType
-            +string Timestamp
-            +string ActorUID
-            +string StudentUID
-            +string CourseUID
-            +float64 Grade
-            +string PayloadHash
-        }
-        class Log {
-            +string LogID
-            +string Version
-            +string GeneratedAt
-            +int EventCount
-            +Event[] Events
-        }
-        class Report {
-            +string LogID
-            +int EventCount
-            +string PlainLogHash
-            +string EncryptedLogHash
-            +string DecryptedLogHash
-            +bool IntegrityPreserved
-        }
+    class Presenter {
+        +PresentGeneratedEvents(events []Event) error
+        +PresentProtection(res ProtectionResult) error
+        +PresentReport(rep Report) error
     }
 
-    namespace crypto {
-        class Hasher {
-            <<interface>>
-            +HashHex(data []byte) string
-        }
-        class Encryptor {
-            <<interface>>
-            +GenerateKey() ([]byte, error)
-            +Encrypt(key []byte, plaintext []byte) ([]byte, error)
-            +Decrypt(key []byte, data []byte) ([]byte, error)
-        }
-        class SHA256Hasher {
-            +HashHex(data []byte) string
-        }
-        class AESGCMEncryptor {
-            +GenerateKey() ([]byte, error)
-            +Encrypt(key []byte, plaintext []byte) ([]byte, error)
-            +Decrypt(key []byte, data []byte) ([]byte, error)
-        }
+    class ProtectionService {
+        <<interface>>
+        +Protect(events []Event) (ProtectionResult, error)
     }
 
-    namespace generator {
-        class EventGenerator {
-            <<interface>>
-            +Generate(n int) ([]Event, error)
-        }
-        class RandomEventGenerator {
-            +Generate(n int) ([]Event, error)
-        }
+    class VerificationService {
+        <<interface>>
+        +Verify() (Report, error)
     }
 
-    namespace logstore {
-        class ArtifactStore {
-            <<interface>>
-            +Save(name string, data []byte, perm FileMode) error
-            +Load(name string) ([]byte, error)
-        }
-        class FileStore {
-            -string baseDir
-            +Save(name string, data []byte, perm FileMode) error
-            +Load(name string) ([]byte, error)
-        }
+    class ProtectionResult {
+        +string LogID
+        +int EventCount
+        +map~EventType,int~ EventsByType
+        +string PlainLogHash
+        +string EncryptedLogHash
+        +string[] ArtifactFiles
     }
 
-    Main ..> Menu : initializes
-    Main ..> SHA256Hasher : instantiates
-    Main ..> AESGCMEncryptor : instantiates
-    Main ..> FileStore : instantiates
-    Main ..> RandomEventGenerator : instantiates
+    class protectionService {
+        -hasher Hasher
+        -encryptor Encryptor
+        -store ArtifactStore
+        -now func() Time
+        -newID func() (string, error)
+        +Protect(events []Event) (ProtectionResult, error)
+    }
 
-    Menu --> ProtectionService : invokes
-    Menu --> VerificationService : invokes
-    Menu --> Presenter : uses
+    class verificationService {
+        -hasher Hasher
+        -encryptor Encryptor
+        -store ArtifactStore
+        +Verify() (Report, error)
+    }
 
-    ProtectionService ..> domain : uses
-    VerificationService ..> domain : uses
+    class TamperingStore {
+        -inner ArtifactStore
+        -scenario string
+        +Save(name string, data []byte, perm FileMode) error
+        +Load(name string) ([]byte, error)
+    }
 
-    ProtectionService --> EventGenerator : depends on
-    ProtectionService --> Hasher : depends on
-    ProtectionService --> Encryptor : depends on
-    ProtectionService --> ArtifactStore : depends on
+    class Event {
+        +string EventID
+        +EventType EventType
+        +string Timestamp
+        +string ActorUID
+        +string StudentUID
+        +string CourseUID
+        +*float64 Grade
+        +*float64 PreviousGrade
+        +*float64 NewGrade
+        +string PayloadHash
+    }
 
-    VerificationService --> Hasher : depends on
-    VerificationService --> Encryptor : depends on
-    VerificationService --> ArtifactStore : depends on
+    class Log {
+        +string LogID
+        +string Version
+        +string GeneratedAt
+        +int EventCount
+        +Event[] Events
+    }
 
-    SHA256Hasher ..|> Hasher : implements
-    AESGCMEncryptor ..|> Encryptor : implements
-    FileStore ..|> ArtifactStore : implements
-    RandomEventGenerator ..|> EventGenerator : implements
+    class Report {
+        +string LogID
+        +int EventCount
+        +map~EventType,int~ EventsByType
+        +string PlainLogHash
+        +string EncryptedLogHash
+        +string DecryptedLogHash
+        +bool IntegrityPreserved
+        +string Details
+    }
 
+    class Hasher {
+        <<interface>>
+        +HashHex(data []byte) string
+    }
+
+    class Encryptor {
+        <<interface>>
+        +GenerateKey() ([]byte, error)
+        +Encrypt(key []byte, plaintext []byte) ([]byte, error)
+        +Decrypt(key []byte, data []byte) ([]byte, error)
+    }
+
+    class SHA256Hasher {
+        +HashHex(data []byte) string
+    }
+
+    class AESGCMEncryptor {
+        +GenerateKey() ([]byte, error)
+        +Encrypt(key []byte, plaintext []byte) ([]byte, error)
+        +Decrypt(key []byte, data []byte) ([]byte, error)
+    }
+
+    class EventGenerator {
+        <<interface>>
+        +Generate(n int) ([]Event, error)
+    }
+
+    class RandomEventGenerator {
+        -rng *Rand
+        -now func() Time
+        -newID func() (string, error)
+        +Generate(n int) ([]Event, error)
+    }
+
+    class ArtifactStore {
+        <<interface>>
+        +Save(name string, data []byte, perm FileMode) error
+        +Load(name string) ([]byte, error)
+    }
+
+    class FileStore {
+        -string baseDir
+        +Save(name string, data []byte, perm FileMode) error
+        +Load(name string) ([]byte, error)
+    }
+
+    Main ..> Menu : inicializa
+    Main ..> SHA256Hasher : instancia
+    Main ..> AESGCMEncryptor : instancia
+    Main ..> FileStore : instancia
+    Main ..> RandomEventGenerator : instancia
+    Main ..> protectionService : instancia
+    Main ..> verificationService : instancia
+
+    Menu --> ProtectionService : invoca
+    Menu --> VerificationService : invoca
+    Menu --> EventGenerator : invoca
+    Menu --> Presenter : usa
+    Menu *-- Session : contiene
+
+    protectionService ..|> ProtectionService : implementa
+    protectionService --> Hasher : depende
+    protectionService --> Encryptor : depende
+    protectionService --> ArtifactStore : depende
+
+    verificationService ..|> VerificationService : implementa
+    verificationService --> Hasher : depende
+    verificationService --> Encryptor : depende
+    verificationService --> ArtifactStore : depende
+
+    TamperingStore ..|> ArtifactStore : implementa
+    TamperingStore --> ArtifactStore : decora
+
+    SHA256Hasher ..|> Hasher : implementa
+    AESGCMEncryptor ..|> Encryptor : implementa
+    FileStore ..|> ArtifactStore : implementa
+    RandomEventGenerator ..|> EventGenerator : implementa
